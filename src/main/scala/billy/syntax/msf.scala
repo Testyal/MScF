@@ -3,7 +3,7 @@ package billy.syntax
 import billy.mscf.Msf
 import scalaz.{ICons, IList, INil, Monad}
 
-object mscf {
+object msf {
   implicit final class MsfOps[M[_] : Monad, In, Out](private val msf: Msf[M, In, Out]) {
     private val M: Monad[M] = implicitly[Monad[M]]
     import M.monadSyntax._
@@ -17,6 +17,7 @@ object mscf {
 
     def andThen[FarOut](msf2: Msf[M, Out, FarOut]): Msf[M, In, FarOut] = Msf.compose(msf, msf2)
     def >>>[FarOut](msf2: Msf[M, Out, FarOut]): Msf[M, In, FarOut] = andThen(msf2)
+    // IntelliJ is freaking out about the perfectly compilable '>>>' in this line
     def ***[In2, Out2](msf2: Msf[M, In2, Out2]): Msf[M, (In, In2), (Out, Out2)] = msf.first[In2] >>> msf2.second[Out]
     def &&&[Out2](msf2: Msf[M, In, Out2]): Msf[M, In, (Out, Out2)] = Msf.arr((a: In) => (a, a)) >>> (msf *** msf2)
 

@@ -10,15 +10,15 @@ object Msf {
   def head[M[_] : Monad, In, Out](a: In, msf: Msf[M, In, Out]): M[Out] = msf.runMsf(a).map(_._1)
   def tail[M[_] : Monad, In, Out](a: In, msf: Msf[M, In, Out]): M[Msf[M, In, Out]] = msf.runMsf(a).map(_._2)
 
-  def first[M[_] : Monad, A, B, C](msf: Msf[M, A, B]): Msf[M, (A, C), (B, C)] = Msf { ac =>
+  def first[M[_] : Monad, In, Out, Other](msf: Msf[M, In, Out]): Msf[M, (In, Other), (Out, Other)] = Msf { case (in, other) =>
     for {
-      b <- msf.runMsf(ac._1)
-    } yield ((b._1, ac._2), first(msf))
+      out <- msf.runMsf(in)
+    } yield ((out, other), first(msf))
   }
-  def second[M[_] : Monad, A, B, C](msf: Msf[M, B, C]): Msf[M, (A, B), (A, C)] = Msf { ab =>
+  def second[M[_] : Monad, Other, In, Out](msf: Msf[M, In, Out]): Msf[M, (Other, In), (Other, Out)] = Msf { case (other, in) =>
     for {
-      c <- msf.runMsf(ab._2)
-    } yield ((ab._1, c._1), second(msf))
+      out <- msf.runMsf(in)
+    } yield ((other, out), second(msf))
   }
 
   def compose[M[_] : Monad, In, Mid, Out](msf1: Msf[M, In, Mid], msf2: Msf[M, Mid, Out]): Msf[M, In, Out] = Msf { in =>
