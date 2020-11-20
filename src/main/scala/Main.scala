@@ -1,6 +1,6 @@
 import billy.mscf.Msf
 import billy.syntax.mscf._
-import scalaz.{INil, Show}
+import scalaz.{ICons, INil, Show}
 import scalaz.effect.IO
 
 object Main extends SafeApp {
@@ -18,7 +18,7 @@ object Main extends SafeApp {
 
     implicit def showFromToString: Show[String] = Show.showFromToString[String]
     for {
-      _ <- (feedbackedMsf >>> printingSf[String]).step("Hello world")
+      _ <- (feedbackedMsf >>> printingSf[String]).embed("Hello" :: "World" :: "Penis" :: INil())
     } yield ()
   }
 }

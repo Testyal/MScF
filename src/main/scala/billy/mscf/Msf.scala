@@ -21,11 +21,13 @@ object Msf {
     } yield ((ab._1, c._1), second(msf))
   }
 
-  def compose[M[_] : Monad, In, Mid, Out](msfa: Msf[M, In, Mid], msfb: Msf[M, Mid, Out]): Msf[M, In, Out] = Msf { a =>
+  def compose[M[_] : Monad, In, Mid, Out](msf1: Msf[M, In, Mid], msf2: Msf[M, Mid, Out]): Msf[M, In, Out] = Msf { in =>
     for {
-      b <- head(a, msfa)
-      c <- head(b, msfb)
-    } yield (c, compose(msfa, msfb))
+      midAndMsf        <- step(in, msf1)
+      (mid, msf1Prime) = midAndMsf
+      outAndMsf        <- step(mid, msf2)
+      (out, msf2Prime) = outAndMsf
+    } yield (out, compose(msf1Prime, msf2Prime))
   }
 
   def arr[M[_] : Monad, In, Out](f: In => Out): Msf[M, In, Out] = Msf { a =>

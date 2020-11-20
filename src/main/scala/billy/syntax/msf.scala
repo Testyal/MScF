@@ -24,7 +24,7 @@ object mscf {
       case INil()            => M.pure(INil())
       case ICons(head, tail) => msf.step(head).flatMap { case (out, msf2) =>
         msf2.embed(tail).map { outs =>
-          out +: outs
+          out :: outs
         }
       }
     }
