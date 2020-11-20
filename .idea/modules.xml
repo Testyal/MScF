@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="ProjectModuleManager">
+    <modules>
+      <module fileurl="file://$PROJECT_DIR$/.idea/modules/MScF.iml" filepath="$PROJECT_DIR$/.idea/modules/MScF.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/modules/MScF-build.iml" filepath="$PROJECT_DIR$/.idea/modules/MScF-build.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/modules/MonadicStreamFunctions-build.iml" filepath="$PROJECT_DIR$/.idea/modules/MonadicStreamFunctions-build.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/modules/Scala.MScF.iml" filepath="$PROJECT_DIR$/.idea/modules/Scala.MScF.iml" />
+    </modules>
+  </component>
+</project>
