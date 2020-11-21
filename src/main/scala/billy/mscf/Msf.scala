@@ -12,12 +12,12 @@ object Msf {
 
   def first[M[_] : Monad, In, Out, Other](msf: Msf[M, In, Out]): Msf[M, (In, Other), (Out, Other)] = Msf { case (in, other) =>
     for {
-      out <- msf.runMsf(in)
+      out <- head(in, msf)
     } yield ((out, other), first(msf))
   }
   def second[M[_] : Monad, Other, In, Out](msf: Msf[M, In, Out]): Msf[M, (Other, In), (Other, Out)] = Msf { case (other, in) =>
     for {
-      out <- msf.runMsf(in)
+      out <- head(in, msf)
     } yield ((other, out), second(msf))
   }
 
@@ -42,6 +42,26 @@ object Msf {
       bsm                     <- msf.runMsf(a, state)
       ((b, newState), newMsf) = bsm
     } yield (b, feedback(newState, newMsf))
+  }
+
+  def embed[M[_] : Monad, In, Out](values: IList[In], msf: Msf[M, In, Out]): M[IList[Out]] = {
+    val M = implicitly[Monad[M]]
+    import M.monadSyntax._
+
+    values match {
+      case INil()            => M.pure(INil())
+      case ICons(head, tail) => for {
+          outAndMsf   <- step(head, msf)
+          (out, msf2) = outAndMsf
+          outs        <- embed(tail, msf2)
+        } yield out :: outs
+    }
+  }
+  def reactimate[M[_] : Monad](msf: Msf[M, Unit, Unit]): M[Unit] = {
+    for {
+      unitAndMsf <- step((), msf)
+      (_, msf2)  = unitAndMsf
+    } yield reactimate(msf2)
   }
 
 }
