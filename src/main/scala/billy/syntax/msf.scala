@@ -22,7 +22,6 @@ object msf {
 
     def >>>[FarOut](msf2: Msf[M, Out, FarOut]): Msf[M, In, FarOut] = Msf.sequence(msf, msf2)
 
-    // IntelliJ is freaking out about the perfectly compilable '>>>' in this line
     def ***[In2, Out2](msf2: Msf[M, In2, Out2]): Msf[M, (In, In2), (Out, Out2)] = Msf.parallel(msf, msf2)
 
     def &&&[Out2](msf2: Msf[M, In, Out2]): Msf[M, In, (Out, Out2)] = Msf.broadcast(msf, msf2)
