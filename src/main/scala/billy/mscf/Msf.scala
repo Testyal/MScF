@@ -70,12 +70,92 @@ import scalaz.syntax.monad._
 final case class Msf[M[_]: Monad, In, Out] private(private val runMsf: In => M[(Out, Msf[M, In, Out])])
 
 object Msf {
-  def step[M[_] : Monad, In, Out](a: In, msf: Msf[M, In, Out]): M[(Out, Msf[M, In, Out])] = msf.runMsf(a)
-  def head[M[_] : Monad, In, Out](a: In, msf: Msf[M, In, Out]): M[Out] = msf.runMsf(a).map(_._1)
-  def tail[M[_] : Monad, In, Out](a: In, msf: Msf[M, In, Out]): M[Msf[M, In, Out]] = msf.runMsf(a).map(_._2)
+  /**
+   * Steps a monadic stream function forward with a given sample input.
+   *
+   * @example An MSF which capitalizes its input until it encounters the input "stop" and lies in a safely ignorable
+   *          monadic context `M` may be stepped like so
+   * {{{
+   * scala> val (out, msf2) = capitalizingMsf.step("Hello world")
+   * val out: String = "HELLO WORLD"
+   * val msf2: Msf[M, String, String] = [...]
+   *
+   * scala> val (out2, msf3) = msf2.step("stop")
+   * val out2: String = "stop"
+   * val msf3: Msf[M, String, String] = [...]
+   *
+   * scala> val (out3, _) = msf3.step("Hello again, world")
+   * val out3: String = "Hello again, world"
+   * }}}
+   * @see [[billy.mscf.Msf#head]], [[billy.mscf.Msf#tail]]
+   *
+   * @param a   the value to pass into the MSF.
+   * @param msf the msf to step forward.
+   * @tparam M   the monadic context under which the output and continuation are returned.
+   * @tparam In  the msf's input type.
+   * @tparam Out the msf's output type.
+   *
+   * @return the output of the MSF's computation and a continuation of the MSF under the monadic context `M`.
+   */
+  def step[M[_]: Monad, In, Out](msf: Msf[M, In, Out])(a: In): M[(Out, Msf[M, In, Out])] = msf.runMsf(a)
 
+  /**
+   * Steps a monadic stream function forward with a given sample input, returning only the output.
+   *
+   * @see [[billy.mscf.Msf#step]], [[billy.mscf.Msf#tail]]
+   *
+   * @param msf the MSF to step forward.
+   * @param a   the sample to pass into the MSF.
+   * @tparam M   the monadic context under which the output is returned.
+   * @tparam In  the type of the input to the MSF.
+   * @tparam Out the type of the output from the MSF.
+   *
+   * @return the output of the MSF's computation under the monadic context `M`.
+   */
+  def head[M[_]: Monad, In, Out](msf: Msf[M, In, Out])(a: In): M[Out] = msf.runMsf(a).map(_._1)
+
+  /**
+   * Steps a monadic stream function forward with a given sample input, returning only the continuation of the MSF.
+   *
+   * @see [[billy.mscf.Msf#step]], [[billy.mscf.Msf#head]]
+   *
+   * @param msf the MSF to step forward.
+   * @param a   the sample to pass into the MSF.
+   * @tparam M   the monadic context under which the continuation is returned.
+   * @tparam In  the type of the input to the MSF.
+   * @tparam Out the type of the output from the MSF.
+   *
+   * @return the continuation of the MSF under the monadic context `M`.
+   */
   def tail[M[_]: Monad, In, Out](msf: Msf[M, In, Out])(a: In): M[Msf[M, In, Out]] = msf.runMsf(a).map(_._2)
 
+  /**
+   * Extends an MSF with an additional input and output of the same type, which passes through the extended MSF with
+   * nothing done to it.
+   * <p>
+   * This method and its sister [[billy.mscf.Msf#second]] are used for plumbing. The extended MSF will have new input
+   * type `(In, Other)` and new output type `(Out, Other)`, where `In` and `Out` are the input and output types of
+   * the original MSF.
+   *
+   * @example An MSF which takes in a double input and a string input, doubles the number, then prints the string and
+   *          doubled number together can be implemented using `first` like so
+   * {{{
+   * val doublingPrintingMsf: Msf[IO, (Double, String), Unit] =
+   *   Msf.sequence(Msf.first(Msf.arr { x => x + x }),
+   *                Msf.liftS { case (str, doubled) =>
+   *                  IO { println(s"Hello $str, your number doubled is $doubled." }
+   *                })
+   * }}}
+   * @see [[billy.mscf.Msf#second]]
+   *
+   * @param msf the MSF to extend with an input and output of the same type.
+   * @tparam M     the monadic context under which the MSF returns its output and continuation.
+   * @tparam In    the input type of the MSF.
+   * @tparam Out   the output type of the MSF.
+   * @tparam Other the type of the new input and output to add to the MSF.
+   *
+   * @return the MSF extended with an additional input and output.
+   */
   def first[M[_]: Monad, In, Out, Other](msf: Msf[M, In, Out]): Msf[M, (In, Other), (Out, Other)] = {
     Msf { case (in, other) =>
       for {
@@ -87,12 +167,67 @@ object Msf {
     }
   }
 
+  /**
+   * Extends an MSF with an additional input and output of the same type, which passes through the extended MSF with
+   * nothing done to it.
+   * <p>
+   * This method and its sister [[billy.mscf.Msf#first]] are used for plumbing. The extended MSF will have new input
+   * type `(Other, In)` and new output type `(Other, Out)`, where `In` and `Out` are the input and output types of
+   * the original MSF.
+   *
+   * @see [[billy.mscf.Msf#first]]
+   *
+   * @param msf the MSF to extend with an input and output of the same type.
+   * @tparam M     the monadic context under which the MSF returns its output and continuation.
+   * @tparam Other the type of the new input and output to add to the MSF.
+   * @tparam In    the input type of the MSF.
+   * @tparam Out   the output type of the MSF.
+   *
+   * @return the MSF extended with an additional input and output.
+   */
   def second[M[_]: Monad, Other, In, Out](msf: Msf[M, In, Out]): Msf[M, (Other, In), (Other, Out)] = {
     def swap[A, B](xy: (A, B)): (B, A) = xy.swap
 
     sequence(sequence(arr(swap[Other, In]), first[M, In, Out, Other](msf)), arr(swap[Out, Other]))
   }
 
+  /**
+   * Joins two MSFs, attaching the output of the first to the input of the second.
+   * <p>
+   * The output of the joined MSF is equivalent to passing an input through the first MSF, taking the output of that,
+   * then passing it as input to the second MSF. The continuation of the joined MSF after passing an input is
+   * equivalent to the continuation of the the first MSF passed the input, joined with the continuation of the second
+   * MSF passed the output of the first MSF.
+   *
+   * @example Consider two MSFs, one, called `capitalizingMsf` which capitalizes its input until it encounters the
+   *          input "stop", and another, called `periodMsf` which adds a period. The joined MSF will capitalize its
+   *          input and add a period, until it encounters the input "stop", from which time it will just add a period.
+   *          We assume the monadic context `M` can be safely ignored.
+   * {{{
+   * scala> val capitalizingAndPeriodMsf = Msf.sequence(capitalizingMsf, periodMsf)
+   * [...]
+   *
+   * scala> val (out, msf2) = capitalizingAndPeriodMsf.step("Hello world")
+   * val out: String = "HELLO WORLD."
+   * val msf2: Msf[M, String, String] = [...]
+   *
+   * scala> val (out2, msf3) = msf2.step("stop")
+   * val out2: String = "stop."
+   * val msf2: Msf[M, String, String] = [...]
+   *
+   * scala> val (out3, _) = msf3.step("Hello world")
+   * val out3: String = "Hello world."
+   * }}}
+   *
+   * @param msf1 the first MSF, whose output is joined to the input of the second.
+   * @param msf2 the second MSF, whose input is joined to the output of the first.
+   * @tparam M   the monadic context under which the output and continuation of the MSFs are returned.
+   * @tparam In  the type of the input to the first MSF.
+   * @tparam Mid the type of the output to the first MSF, and the type of the input to the second MSF.
+   * @tparam Out the type of the output of the second MSF.
+   *
+   * @return the joined MSF.
+   */
   def sequence[M[_]: Monad, In, Mid, Out](msf1: Msf[M, In, Mid], msf2: Msf[M, Mid, Out]): Msf[M, In, Out] = Msf { in =>
     for {
       midAndMsf <- step(msf1)(in)
@@ -104,6 +239,19 @@ object Msf {
     }
   }
 
+  /**
+   * Joins two MSFs in parallel, creating an MSF with two inputs and two outputs.
+   *
+   * @param msf1
+   * @param msf2
+   * @tparam M
+   * @tparam In1
+   * @tparam In2
+   * @tparam Out1
+   * @tparam Out2
+   *
+   * @return
+   */
   def parallel[M[_]: Monad, In1, In2, Out1, Out2](msf1: Msf[M, In1, Out1],
                                                   msf2: Msf[M, In2, Out2]): Msf[M, (In1, In2), (Out1, Out2)] = {
     sequence(first[M, In1, Out1, In2](msf1), second[M, Out1, In2, Out2](msf2))
@@ -118,21 +266,66 @@ object Msf {
     sequence(broadcast(arr(identity), msf1), msf2)
   }
 
+  /**
+   * Constructs a MSF from a pure function.
+   * <p>
+   * The output from the MSF given an input `x` is equal to `M.pure(f(x))`. The continuation is the same as the
+   * original.
+   *
+   * @see [[billy.mscf.Msf#liftS]]
+   *
+   * @param f the pure function to create an MSF from.
+   * @tparam M   the monadic context under which the MSF should return its output.
+   * @tparam In  the input type of the function `f`, equivalently the input type to the created MSF.
+   * @tparam Out the output type of the function `f`, equivalently the output type to the created MSF.
+   *
+   * @return an MSF created from the pure function `f`.
+   */
   def arr[M[_]: Monad, In, Out](f: In => Out): Msf[M, In, Out] = Msf { a =>
     implicitly[Monad[M]].pure((f(a), arr(f)))
   }
 
+  /**
+   * Lifts a monadic computation into an MSF.
+   * <p>
+   * The output from the MSF given an input `x` is `f(x)`. The continuation is the same as the original.
+   *
+   * @see [[billy.mscf.Msf#arr]]
+   *
+   * @param f the monadic computation to lift into an MSF.
+   * @tparam M   the monadic context under which `f` runs.
+   * @tparam In  the input type of `f`.
+   * @tparam Out the output type of `f`.
+   *
+   * @return an MSF lifted from the monadic computation `f`.
+   */
   def liftS[M[_]: Monad, In, Out](f: In => M[Out]): Msf[M, In, Out] = Msf { a =>
     f(a).map((_, liftS(f)))
   }
 
-  def feedback[M[_] : Monad, In, Out, State](state: State, msf: Msf[M, (In, State), (Out, State)]): Msf[M, In, Out] = Msf { a =>
-    for {
-      bsm                     <- msf.runMsf(a, state)
-      ((b, newState), newMsf) = bsm
-    } yield (b, feedback(newState, newMsf))
+  def feedback[M[_]: Monad, In, Out, State](state: State, msf: Msf[M, (In, State), (Out, State)]): Msf[M, In, Out] = {
+    Msf { a =>
+      for {
+        bsm <- msf.runMsf(a, state)
+        ((b, newState), newMsf) = bsm
+      } yield {
+        (b, feedback(newState, newMsf))
+      }
+    }
   }
 
+  /**
+   * Evaluates a MSF on a sequence of sample inputs.
+   * <p>
+   *
+   *
+   * @param values
+   * @param msf
+   * @tparam M
+   * @tparam In
+   * @tparam Out
+   * @return
+   */
   def embed[M[_]: Monad, In, Out](values: IList[In], msf: Msf[M, In, Out]): M[IList[Out]] = {
     val M = implicitly[Monad[M]]
     import M.monadSyntax._
