@@ -197,7 +197,14 @@ object Msf {
    * The output of the joined MSF is equivalent to passing an input through the first MSF, taking the output of that,
    * then passing it as input to the second MSF. The continuation of the joined MSF after passing an input is
    * equivalent to the continuation of the the first MSF passed the input, joined with the continuation of the second
-   * MSF passed the output of the first MSF.
+   * MSF passed the output of the first MSF. That is,
+   * {{{
+   * head(sequence(f, g))(a) == head(f)(a) flatMap { b => head(g)(b) }
+   * }}}
+   * and for `val b = head(f)(a)`,
+   * {{{
+   * tail(sequence(f, g))(a) == sequence(tail(f)(a), tail(g)(b))
+   * }}}
    *
    * @example Consider two MSFs, one, called `capitalizingMsf` which capitalizes its input until it encounters the
    *          input "stop", and another, called `periodMsf` which adds a period. The joined MSF will capitalize its
@@ -240,28 +247,82 @@ object Msf {
   }
 
   /**
-   * Joins two MSFs in parallel, creating an MSF with two inputs and two outputs.
+   * Joins two MSFs running in the same monadic context in parallel, creating an MSF with two inputs and two outputs.
+   * <p>
+   * The first MSF acts on the first input, and the second MSF acts on the second input.  Namely, if `(in1, in2)` is
+   * passed to the parallelization of `msf1` and `msf2`, and we assume the monadic context can be safely ignored,
+   * then the output is
+   * {{{
+   * head(parallel(msf1, msf2))((in1, in2)) = (head(msf1)(in1), head(msf2)(in2)).
+   * }}}
+   * The continuation after passing an input is the parallelization of `tail(msf1)(in1)` and `tail(msf2)(in2)`.
+   * <p>
+   * Any side effects performed by the parallelized MSF are done in order - the first MSF's are performed first, then
+   * the second MSF's.
    *
-   * @param msf1
-   * @param msf2
-   * @tparam M
-   * @tparam In1
-   * @tparam In2
-   * @tparam Out1
-   * @tparam Out2
+   * @see [[billy.mscf.Msf#broadcast]]
    *
-   * @return
+   * @param msf1 the first MSF to parallelize.
+   * @param msf2 the second MSF to parallelize.
+   * @tparam M    the monadic context under which both MSFs run.
+   * @tparam In1  the input type of the first MSF.
+   * @tparam In2  the input type of the second MSF.
+   * @tparam Out1 the output type of the first MSF.
+   * @tparam Out2 the output type of the second MSF.
+   *
+   * @return the parallelization of the first and second MSFs.
    */
   def parallel[M[_]: Monad, In1, In2, Out1, Out2](msf1: Msf[M, In1, Out1],
                                                   msf2: Msf[M, In2, Out2]): Msf[M, (In1, In2), (Out1, Out2)] = {
     sequence(first[M, In1, Out1, In2](msf1), second[M, Out1, In2, Out2](msf2))
   }
 
+  /**
+   * Joins two MSFs with the same input type together to create an MSF with one input and two outputs.
+   * <p>
+   * The broadcasted MSF acts on an input by passing it to both MSFs, the output being a tuple whose first component
+   * is the output of the first MSF passed the input, and whose second component is the output of the second MSF
+   * passed the input. Namely, assuming the monadic context can be safely ignored,
+   * {{{
+   * head(broadcast(msf1, msf2))(in) = (head(msf1)(in), head(msf2)(in)).
+   * }}}
+   * The continuation after passing an input `in` is the broadcast of `tail(msf1)(in)` and `tail(msf2)(in)`.
+   * <p>
+   * Any side effects performed by the broadcasted MSF are done in order - the first MSF's side effects are performed
+   * first, then the second MSF's are performed.
+   *
+   * @see [[billy.mscf.Msf#parallel]]
+   *
+   * @param msf1 the first MSF to join in a broadcasted MSF.
+   * @param msf2 the second MSF to join in a broadcasted MSF.
+   * @tparam M    the monadic context under which both MSFs run.
+   * @tparam In   the input type of both MSFs.
+   * @tparam Out1 the output type of the first MSF.
+   * @tparam Out2 the output type of the second MSF.
+   *
+   * @return the broadcasted join of the first and second MSFs.
+   */
   def broadcast[M[_]: Monad, In, Out1, Out2](msf1: Msf[M, In, Out1],
                                              msf2: Msf[M, In, Out2]): Msf[M, In, (Out1, Out2)] = {
     sequence(arr { x => (x, x) }, parallel(msf1, msf2))
   }
 
+  /**
+   * Passes an input to two MSFs, also passing the output of the first MSF to the second MSF.
+   * <p>
+   * Shorthand for `sequence(broadcast(arr(identity), msf1), msf2)`, where `identity` is the identity function on the
+   * input type `In`. In particular, the second MSF is required to have a tuple type as its input, the first
+   * component being the type of the input, and the second component being the type of the output from the first MSF.
+   *
+   * @param msf1 the first MSF to bind; only receives the input value.
+   * @param msf2 the second MSF to bind; receives both the input value and the output of the first MSF.
+   * @tparam M   the monadic context under which both MSFs run.
+   * @tparam In  the input type of the first MSF, and the first input type of the second MSF.
+   * @tparam Mid the output type of the first MSF, and the second input type of the second MSF.
+   * @tparam Out the output type of the second MSF.
+   *
+   * @return the bind of the first and second MSFs.
+   */
   def bind[M[_]: Monad, In, Mid, Out](msf1: Msf[M, In, Mid], msf2: Msf[M, (In, Mid), Out]): Msf[M, In, Out] = {
     sequence(broadcast(arr(identity), msf1), msf2)
   }
@@ -317,20 +378,30 @@ object Msf {
   /**
    * Evaluates a MSF on a sequence of sample inputs.
    * <p>
+   * Recursively, this function can be defined as follows: the MSF is passed the first input value in the list; its
+   * output is added to an output list, and its continuation is evaluated on the remaining list. Alternatively, we
+   * pass the MSF each value in the list in order, modifying the MSF each time.
    *
+   * @example Consider an MSF `periodizingMsf` which takes a string as input and adds a number `n` of periods to the
+   *          end of the string. Each time, the number `n` of periods is increased by one, starting from `n = 0`.
+   * {{{
+   * scala> embed("four score" :: "and seven years ago" :: "our fathers" :: "brought forth" :: "on this continent")
+   * "four score" :: "and seven years ago." :: "our fathers.." :: "brought forth..." :: "on this continent...."
+   * }}}
    *
-   * @param values
-   * @param msf
-   * @tparam M
-   * @tparam In
-   * @tparam Out
-   * @return
+   * @param ins the list of inputs to pass the MSF.
+   * @param msf the msf to be passed a list of inputs.
+   * @tparam M   the monadic context under which the MSF runs.
+   * @tparam In  the input type of the MSF.
+   * @tparam Out the output type of the MSF.
+   *
+   * @return a list of outputs.
    */
-  def embed[M[_]: Monad, In, Out](values: IList[In], msf: Msf[M, In, Out]): M[IList[Out]] = {
+  def embed[M[_]: Monad, In, Out](ins: IList[In], msf: Msf[M, In, Out]): M[IList[Out]] = {
     val M = implicitly[Monad[M]]
     import M.monadSyntax._
 
-    values match {
+    ins match {
       case INil()            => M.pure(INil())
       case ICons(head, tail) => {
         for {
@@ -344,6 +415,31 @@ object Msf {
     }
   }
 
+  /**
+   * Indefinitely evaluates a unit-carrying MSF.
+   * <p>
+   * A reactive program built around MSFs will normally have a unit-carrying MSF at the top of the chain, composed of
+   * a ''stream'' (an MSF with input type `Unit`), something in the middle, and at the end a ''sink'' (an MSF with
+   * output type `Unit`). Reactimation is the way to lift this MSF into the computation world.
+   *
+   * @example Consider a unit-carrying MSF `program`, constructed as the sequence of three MSFs in the IO context: a
+   *          stream which asks for input from the user, a middle MSF which capitalizes its input, and a sink which
+   *          prints its input. The reactimation of `program` will be an IO computation which continually asks a user
+   *          for input, capitalizes it, and prints it until forcibly closed.
+   * {{{
+   * scala> reactimate(program).unsafePerformIO()
+   * Enter some text: hello world
+   * HELLO WORLD
+   * Enter some text: how are you?
+   * HOW ARE YOU?
+   * [...]
+   * }}}
+   *
+   * @param msf a unit-carrying MSF to indefinitely evaluate.
+   * @tparam M the monadic context under which the MSF runs.
+   *
+   * @return a monadic computation which indefinitely evaluates the msf.
+   **/
   def reactimate[M[_]: Monad](msf: Msf[M, Unit, Unit]): M[Unit] = {
     for {
       unitAndMsf <- step(msf)(())
