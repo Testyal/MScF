@@ -87,6 +87,7 @@ object Msf {
    * scala> val (out3, _) = msf3.step("Hello again, world")
    * val out3: String = "Hello again, world"
    * }}}
+   *
    * @see [[billy.mscf.Msf#head]], [[billy.mscf.Msf#tail]]
    *
    * @param a   the value to pass into the MSF.

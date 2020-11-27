@@ -3,8 +3,8 @@ package billy.mscf.instance
 import billy.mscf.Msf
 import scalaz.{ Arrow, Monad }
 
-object MsfInstances {
-  implicit def msfArrow[M[_]: Monad]: Arrow[({
+object msf {
+  implicit def arrow[M[_]: Monad]: Arrow[({
     type T[A, B] = Msf[M, A, B]
   })#T] = new Arrow[({type T[A, B] = Msf[M, A, B]})#T] {
     override def arr[In, Out](f: In => Out): Msf[M, In, Out] = Msf.arr(f)
