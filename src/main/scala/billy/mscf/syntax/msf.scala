@@ -1,4 +1,4 @@
-package billy.syntax
+package billy.mscf.syntax
 
 import billy.mscf.Msf
 import scalaz.{ Arrow, ICons, IList, INil, Monad }

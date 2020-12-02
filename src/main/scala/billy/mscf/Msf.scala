@@ -45,7 +45,7 @@ import scalaz.syntax.monad._
  *   Msf.arr { case (_, squared) => squared }
  * }}}
  * Here, `>>>` and `&&&` are operator shorthand for `sequence` and `broadcast` respectively, defined in
- * [[billy.syntax.msf]]. The benefit of this approach is in the explicitness of the inputs and outputs in our new
+ * [[billy.mscf.syntax.msf]]. The benefit of this approach is in the explicitness of the inputs and outputs in our new
  * printing MSF, making it reusable in other MSFs. The rest is just plumbing.
  *
  * == Evaluating MSFs ==
@@ -58,7 +58,7 @@ import scalaz.syntax.monad._
  * MSF (i.e. one of type `Msf[M, Unit, Unit]`) can be simulated using [[billy.mscf.Msf#reactimate]].
  *
  * == Syntax Extensions ==
- * The object [[billy.syntax.msf]] contains a number of convenient extensions to MSF objects to avoid having to call
+ * The object [[billy.mscf.syntax.msf]] contains a number of convenient extensions to MSF objects to avoid having to call
  * methods in [[billy.mscf.Msf]].
  *
  * @tparam M   the monadic context under which an output stream and continuation of the MSF is returned.
