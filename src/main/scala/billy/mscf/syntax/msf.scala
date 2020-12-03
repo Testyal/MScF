@@ -1,7 +1,7 @@
 package billy.mscf.syntax
 
 import billy.mscf.Msf
-import scalaz.{ Arrow, ICons, IList, INil, Monad }
+import scalaz.{ IList, Monad }
 
 object msf {
 
