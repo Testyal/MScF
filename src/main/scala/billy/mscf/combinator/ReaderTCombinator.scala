@@ -19,7 +19,7 @@ object ReaderTCombinator {
    * @example Consider a program which gets a number `n` at runtime, and an MSF `msf` which adds a configurable
    *          number of periods to an input string.
    * {{{
-   * val msf: Msf[ReaderT[Int, IO, *], String, String] = Msf { in =>
+   * val msf: Msf[ReaderT[Int, Id, *], String, String] = Msf { in =>
    *   ReaderT { env =>
    *     IO { in ++ '.'.repeat(env) }
    *   }
@@ -28,7 +28,7 @@ object ReaderTCombinator {
    * val periodAmount = 5
    * val configuredMsf = runReaderS(msf, periodAmount)
    *
-   * configuredMsf.step("Hello world") // = "Hello world....."
+   * configuredMsf.head("Hello world") // = "Hello world....."
    * }}}
    *
    * @param msf         the MSF with a `ReaderT` monadic context to provide a configuration for.

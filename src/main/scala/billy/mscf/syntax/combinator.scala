@@ -7,10 +7,10 @@ import scalaz.{ Monad, ReaderT }
 
 object combinator {
 
-  /**
-   * [[billy.mscf.combinator.ReaderTCombinator#runReaderS]]
-   */
   implicit final class ReaderOps[M[_]: Monad, Env, In, Out](msf: Msf[ReaderT[Env, M, *], In, Out]) {
+    /**
+     * [[billy.mscf.combinator.ReaderTCombinator#runReaderS]]
+     */
     def runReaderS(environment: Env): Msf[M, In, Out] = ReaderTCombinator.runReaderS(msf, environment)
   }
 
